@@ -5,16 +5,27 @@
 
 class MemoryManager {
   double *front_arr = nullptr, *back_arr = nullptr;
+  boost::shared_mutex mtx_m;
 public:
   MemoryManager (int size){
     front_arr = new double[size];
     back_arr = new double[size];
   }
-  double *GetFrontArr (){ return front_arr; }
-  double *GetBackArr (){ return back_arr; }
-  double *SwapArr (){
-    std::swap(front_arr, back_arr);
+  double *GetFrontArr (){
+    boost::shared_lock<boost::shared_mutex> lock(mtx_m);
+    return front_arr;
+  }
+  double *GetBackArr (){
+    boost::shared_lock<boost::shared_mutex> lock(mtx_m);
     return back_arr;
+  }
+  double *SwapArr (){
+    boost::upgrade_lock<boost::shared_mutex> lock(mtx_m);
+    {
+      boost::upgrade_to_unique_lock<boost::shared_mutex> write_lock(lock);
+      std::swap(front_arr, back_arr);
+      return back_arr;
+    }
   }
 };
 
@@ -47,7 +58,7 @@ public:
     mm_m = mm;
     target_arr = mm_m->GetBackArr();
   }
-  void Send (){
+  void Send () const {
     std::cout << step << ": ";
     for(int i = 0; i < size_m; i++) std::cout << *(target_arr+i);
     std::cout << std::endl << std::endl;
